@@ -1,7 +1,11 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 import yfinance as yf
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder=".")
+
+@app.route("/")
+def index():
+    return send_from_directory(".", "index.html")
 
 @app.route("/api/market")
 def market():
@@ -18,9 +22,7 @@ def market():
             "currency": info.get("currency")
         })
     except Exception as e:
-        return jsonify({
-            "error": str(e)
-        }), 500
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
