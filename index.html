@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Market Data</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+    }
+    input, button {
+      padding: 8px;
+      font-size: 16px;
+    }
+    #result {
+      margin-top: 20px;
+      white-space: pre-wrap;
+      background: #f4f4f4;
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Stock Market Data</h2>
+
+  <input id="ticker" placeholder="AAPL" />
+  <button onclick="getData()">Get data</button>
+
+  <div id="result"></div>
+
+  <script>
+    async function getData() {
+      const ticker = document.getElementById("ticker").value || "AAPL";
+      const res = await fetch(`/api/market?ticker=${ticker}`);
+      const data = await res.json();
+      document.getElementById("result").textContent =
+        JSON.stringify(data, null, 2);
+    }
+  </script>
+
+</body>
+</html>
