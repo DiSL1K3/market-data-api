@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Market Data</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 0 16px;
+    }
+    input, button {
+      padding: 8px;
+      font-size: 16px;
+    }
+    #result {
+      margin-top: 20px;
+      background: #f4f4f4;
+      padding: 16px;
+      display: none;
+    }
+    #result.error { color: #b00020; }
+    .name { color: #555; }
+    .price { font-size: 32px; font-weight: bold; margin: 8px 0; }
+    .up { color: #0a7d32; }
+    .down { color: #b00020; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    td { padding: 4px 0; }
+    td:last-child { text-align: right; }
+    svg { width: 100%; height: 80px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+
+  <h2>Stock Market Data</h2>
+
+  <form id="form">
+    <input id="ticker" placeholder="AAPL" autocomplete="off" />
+    <button id="submit" type="submit">Get data</button>
+  </form>
+
+  <div id="result"></div>
+
+  <script>
+    const form = document.getElementById("form");
+    const button = document.getElementById("submit");
+    const result = document.getElementById("result");
+
+    const fmt = (n, opts) =>
+      n == null ? "—" : Number(n).toLocaleString("en-US", opts);
+    const compact = (n) => fmt(n, { notation: "compact", maximumFractionDigits: 2 });
+
+    function el(tag, text, className) {
+      const node = document.createElement(tag);
+      if (text != null) node.textContent = text;
+      if (className) node.className = className;
+      return node;
+    }
+
+    function sparkline(points) {
+      const closes = points.map((p) => p.close);
+      const min = Math.min(...closes), max = Math.max(...closes);
+      const span = max - min || 1;
+      const coords = closes.map((c, i) =>
+        `${(i / Math.max(closes.length - 1, 1)) * 100},${40 - ((c - min) / span) * 40}`);
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 -2 100 44");
+      svg.setAttribute("preserveAspectRatio", "none");
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+      line.setAttribute("points", coords.join(" "));
+      line.setAttribute("fill", "none");
+      line.setAttribute("stroke", closes[closes.length - 1] >= closes[0] ? "#0a7d32" : "#b00020");
+      line.setAttribute("stroke-width", "1");
+      line.setAttribute("vector-effect", "non-scaling-stroke");
+      svg.appendChild(line);
+      return svg;
+    }
+
+    function render(data, history) {
+      result.className = "";
+      result.replaceChildren();
+      result.appendChild(el("div", `${data.ticker}${data.exchange ? " · " + data.exchange : ""}`));
+      if (data.name) result.appendChild(el("div", data.name, "name"));
+
+      const price = el("div", `${fmt(data.price, { maximumFractionDigits: 2 })} ${data.currency || ""}`, "price");
+      if (data.changePercent != null) {
+        const sign = data.changePercent >= 0 ? "+" : "";
+        price.appendChild(el("span", ` ${sign}${data.changePercent}%`,
+          data.changePercent >= 0 ? "up" : "down"));
+      }
+      result.appendChild(price);
+
+      if (history && history.points && history.points.length > 1) {
+        result.appendChild(sparkline(history.points));
+      }
+
+      const table = el("table");
+      [
+        ["Previous close", fmt(data.previousClose, { maximumFractionDigits: 2 })],
+        ["Volume", compact(data.volume)],
+        ["Market cap", compact(data.marketCap)],
+        ["52-week range", `${fmt(data.fiftyTwoWeekLow)} – ${fmt(data.fiftyTwoWeekHigh)}`],
+      ].forEach(([label, value]) => {
+        const row = el("tr");
+        row.appendChild(el("td", label));
+        row.appendChild(el("td", value));
+        table.appendChild(row);
+      });
+      result.appendChild(table);
+    }
+
+    function showError(message) {
+      result.className = "error";
+      result.textContent = message;
+    }
+
+    async function getJson(url) {
+      const res = await fetch(url);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      return data;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const ticker = encodeURIComponent(document.getElementById("ticker").value.trim() || "AAPL");
+      button.disabled = true;
+      result.style.display = "block";
+      result.className = "";
+      result.textContent = "Loading…";
+      try {
+        const [quote, history] = await Promise.all([
+          getJson(`/api/market?ticker=${ticker}`),
+          getJson(`/api/history?ticker=${ticker}&period=1mo`).catch(() => null),
+        ]);
+        render(quote, history);
+      } catch (err) {
+        showError(err.message);
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+
+</body>
+</html>
