@@ -1,2 +1,3 @@
-flask
-yfinance
+flask==3.1.3
+yfinance==1.7.0
+gunicorn==26.2.0
